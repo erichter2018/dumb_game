@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automation Controller</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            color: white;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.8em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .main-controls {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .control-panel {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .control-panel h3 {
+            margin: 0 0 8px 0;
+            color: #4CAF50;
+            font-size: 1em;
+            text-align: center;
+        }
+        
+        .button {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+            margin: 8px auto;
+            display: block;
+            width: 120px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        
+        .button.off {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+        }
+        
+        .slider-group {
+            margin-bottom: 10px;
+        }
+        
+        .slider-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.3);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .value-display {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #4CAF50;
+            text-align: center;
+        }
+        
+        .nudge-controls {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            grid-template-rows: auto auto auto;
+            gap: 8px;
+            align-items: center;
+            justify-items: center;
+            max-width: 150px;
+            margin: 20px auto;
+        }
+        
+        .nudge-btn {
+            background: rgba(76, 175, 80, 0.8);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+        
+        .nudge-btn:hover {
+            background: rgba(76, 175, 80, 1);
+            transform: scale(1.1);
+        }
+        
+        .nudge-center {
+            grid-column: 2;
+            grid-row: 2;
+            background: rgba(255, 255, 255, 0.2);
+            color: #4CAF50;
+            font-size: 12px;
+            cursor: default;
+        }
+        
+        .coordinates-display {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .coord-section {
+            margin-bottom: 8px;
+        }
+        
+        .coord-section h4 {
+            color: #4CAF50;
+            margin: 0 0 8px 0;
+            font-size: 14px;
+        }
+        
+        .coord-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+        
+        .coord-label {
+            color: #81C784;
+            font-weight: bold;
+        }
+        
+        .coord-value {
+            color: white;
+            font-weight: bold;
+        }
+        
+        .preview-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .preview-section h2 {
+            margin: 0 0 8px 0;
+            color: #4CAF50;
+            text-align: center;
+            font-size: 1em;
+        }
+        
+        .preview-container {
+            position: relative;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 6px;
+            padding: 10px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .preview-image {
+            max-width: 100%;
+            max-height: 250px;
+            border-radius: 6px;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+        }
+        
+        .preview-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        
+        .log-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .log-section h2 {
+            margin: 0 0 8px 0;
+            color: #4CAF50;
+            font-size: 1em;
+        }
+        
+        .log-output {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 6px;
+            padding: 10px;
+            height: 120px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 11px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .log-entry {
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+        
+        .status-bar {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .checkbox-group {
+            margin: 15px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin-right: 10px;
+            transform: scale(1.3);
+        }
+        
+        .checkbox-group label {
+            font-size: 16px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Automation Controller</h1>
+        <div class="status-bar" id="status-bar">Status: STOPPED</div>
+        
+        <div class="main-controls">
+                                <div class="control-panel">
+                        <h3>🎮 Main Controls</h3>
+                        <button id="toggle-btn" class="button off">Turn On</button>
+                        
+                        <h3>📍 ROI Presets</h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 15px;">
+                            <button id="roi-research-indicator" class="roi-preset-btn button" data-roi="research_indicator" style="background: #4CAF50;">Research Indicator</button>
+                            <button id="roi-actual-research" class="roi-preset-btn button" data-roi="actual_research" style="background: #2196F3;">Actual Research</button>
+                        </div>
+                        <div style="font-size: 11px; color: #ccc; margin-bottom: 10px;">
+                            Current: <span id="current-roi-name">research_indicator</span>
+                        </div>
+                
+                <h3>🔍 Build Detection</h3>
+                <button id="check-build-btn" class="button" style="width: 100%; background: #2196F3; margin-bottom: 10px;">Check Build</button>
+                <div id="build-images-container" style="display: none; margin-top: 10px;">
+                    <div id="build-images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;"></div>
+                </div>
+                
+                <h3>🔴 Red Blob Detection</h3>
+                <button id="check-red-blob-btn" class="button" style="width: 100%; background: #f44336; margin-bottom: 10px;">Check Red Blob</button>
+                <div id="red-blob-images-container" style="display: none; margin-top: 10px;">
+                    <div id="red-blob-images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;"></div>
+                </div>
+                
+                <div class="coordinates-display">
+                    <div class="coord-section">
+                        <h4>📍 ROI Position</h4>
+                        <div class="coord-row">
+                            <span class="coord-label">X:</span>
+                            <span class="coord-value" id="roi-x">0</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Y:</span>
+                            <span class="coord-value" id="roi-y">0</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Width:</span>
+                            <span class="coord-value" id="roi-width">200</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Height:</span>
+                            <span class="coord-value" id="roi-height">200</span>
+                        </div>
+                    </div>
+                    
+                    <div class="coord-section">
+                        <h4>🎯 Last Detection</h4>
+                        <div class="coord-row">
+                            <span class="coord-label">X:</span>
+                            <span class="coord-value" id="detect-x">-</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Y:</span>
+                            <span class="coord-value" id="detect-y">-</span>
+                        </div>
+                        <div class="coord-row">
+                            <span class="coord-label">Status:</span>
+                            <span class="coord-value" id="detect-status">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="preview-section">
+                <h2>📸 Live ROI Preview</h2>
+                <div class="preview-container">
+                    <img id="roi-preview" src="" alt="Live ROI Preview" class="preview-image" style="display: none;">
+                    <div class="preview-overlay" id="preview-overlay">Waiting for frames...</div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px;">
+                    <button id="everything-btn" class="button" style="background: #4CAF50; font-weight: bold;">🚀 everything</button>
+                    <button id="stop-everything-btn" class="button" style="background: #f44336; font-weight: bold; width: 80px;">⏹️ Stop</button>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 10px;">
+                    <button id="everything-cleanup-btn" class="button" style="background: #2196F3; font-weight: bold;">🧹 Everything with Cleanup</button>
+                    <button id="stop-everything-cleanup-btn" class="button" style="background: #f44336; font-weight: bold; width: 80px;">⏹️ Stop</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="log-section">
+            <h2>📝 Detection Log</h2>
+            <div class="log-output" id="log-output"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let currentRoiX = 360;
+        let currentRoiY = 856;
+        let currentWidth = 50;
+        let currentHeight = 50;
+        let isRunning = false;
+        
+        // UI Elements
+        const toggleBtn = document.getElementById('toggle-btn');
+        const statusBar = document.getElementById('status-bar');
+        const logOutput = document.getElementById('log-output');
+        const roiPreview = document.getElementById('roi-preview');
+        const previewOverlay = document.getElementById('preview-overlay');
+
+        
+
+        
+        // Coordinate displays
+        const roiXDisplay = document.getElementById('roi-x');
+        const roiYDisplay = document.getElementById('roi-y');
+        const roiWidthDisplay = document.getElementById('roi-width');
+        const roiHeightDisplay = document.getElementById('roi-height');
+        const detectXDisplay = document.getElementById('detect-x');
+        const detectYDisplay = document.getElementById('detect-y');
+        const detectStatusDisplay = document.getElementById('detect-status');
+        const checkBuildBtn = document.getElementById('check-build-btn');
+        const checkRedBlobBtn = document.getElementById('check-red-blob-btn');
+        const everythingBtn = document.getElementById('everything-btn');
+        const stopEverythingBtn = document.getElementById('stop-everything-btn');
+        const everythingCleanupBtn = document.getElementById('everything-cleanup-btn');
+        const stopEverythingCleanupBtn = document.getElementById('stop-everything-cleanup-btn');
+        const currentRoiNameDisplay = document.getElementById('current-roi-name');
+        const roiPresetButtons = document.querySelectorAll('.roi-preset-btn');
+        
+
+        
+        // Toggle automation
+        toggleBtn.addEventListener('click', () => {
+            if (isRunning) {
+                fetch('/stop', { method: 'POST' });
+            } else {
+                fetch('/start', { method: 'POST' });
+            }
+        });
+        
+        // Note: Multi-image display no longer needs state tracking
+        
+
+        
+        function updateRoiSettings() {
+            const settings = {
+                x: currentRoiX,
+                y: currentRoiY,
+                width: currentWidth,
+                height: currentHeight,
+                enabled: true
+            };
+            
+            fetch('/update_roi', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+            
+            updateCoordinateDisplay();
+        }
+        
+        function updateCoordinateDisplay() {
+            roiXDisplay.textContent = currentRoiX;
+            roiYDisplay.textContent = currentRoiY;
+            roiWidthDisplay.textContent = currentWidth;
+            roiHeightDisplay.textContent = currentHeight;
+        }
+        
+        function addLogEntry(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logOutput.appendChild(entry);
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+        
+        // Check Build button
+        checkBuildBtn.addEventListener('click', () => {
+            checkBuildBtn.disabled = true;
+            checkBuildBtn.textContent = 'Scanning...';
+            
+            fetch('/check_build', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                })
+                .catch(error => {
+                    addLogEntry('Error scanning builds: ' + error);
+                })
+                .finally(() => {
+                    checkBuildBtn.disabled = false;
+                    checkBuildBtn.textContent = 'Check Build';
+                });
+        });
+        
+
+
+        // Check Red Blob button
+        checkRedBlobBtn.addEventListener('click', () => {
+            checkRedBlobBtn.disabled = true;
+            checkRedBlobBtn.textContent = 'Scanning...';
+            
+            fetch('/check_red_blob', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                })
+                .catch(error => {
+                    addLogEntry('Error checking red blobs: ' + error);
+                })
+                .finally(() => {
+                    checkRedBlobBtn.disabled = false;
+                    checkRedBlobBtn.textContent = 'Check Red Blob';
+                });
+        });
+
+        // Next Red Blob button (REMOVED)
+        /*
+        nextRedBlobBtn.addEventListener('click', () => {
+            if (detectedRedBlobs.length > 0) {
+                currentRedBlobIndex = (currentRedBlobIndex + 1) % detectedRedBlobs.length;
+                displayCurrentRedBlob();
+            }
+        });
+        */
+        
+
+
+        /*
+        function displayCurrentRedBlob() {
+            if (detectedRedBlobs.length > 0 && currentRedBlobIndex < detectedRedBlobs.length) {
+                const redBlob = detectedRedBlobs[currentRedBlobIndex];
+                const keyLetter = String.fromCharCode(65 + currentRedBlobIndex); // A, B, C, D, etc.
+                
+                document.getElementById('red-blob-key').textContent = keyLetter;
+                document.getElementById('red-blob-number').textContent = currentRedBlobIndex + 1;
+                document.getElementById('total-red-blobs').textContent = detectedRedBlobs.length;
+                document.getElementById('red-blob-x').textContent = redBlob.x;
+                document.getElementById('red-blob-y').textContent = redBlob.y;
+                document.getElementById('red-blob-width').textContent = redBlob.width;
+                document.getElementById('red-blob-height').textContent = redBlob.height;
+                document.getElementById('red-blob-circularity').textContent = redBlob.circularity.toFixed(2);
+                
+                // Update ROI preview to show this red blob
+                fetch('/show_red_blob', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ red_blob_index: currentRedBlobIndex })
+                });
+            }
+        }
+        */
+        
+
+
+        // everything button
+        everythingBtn.addEventListener('click', () => {
+            // Disable everything button, enable stop button
+            everythingBtn.disabled = true;
+            everythingBtn.textContent = '🚀 Running everything...';
+            everythingBtn.style.opacity = '0.6';
+            stopEverythingBtn.disabled = false;
+            stopEverythingBtn.style.opacity = '1';
+            
+            fetch('/everything', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                })
+                .catch(error => {
+                    addLogEntry('Error with everything routine: ' + error);
+                    // Only re-enable everything button on error
+                    everythingBtn.disabled = false;
+                    everythingBtn.textContent = '🚀 everything';
+                    everythingBtn.style.opacity = '1';
+                    stopEverythingBtn.disabled = true;
+                    stopEverythingBtn.style.opacity = '0.6';
+                });
+        });
+
+        // stop everything button
+        stopEverythingBtn.addEventListener('click', () => {
+            // Disable stop button while processing
+            stopEverythingBtn.disabled = true;
+            stopEverythingBtn.textContent = '⏹️ Stopping...';
+            
+            fetch('/stop_everything', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                    // Re-enable everything button, disable stop button
+                    everythingBtn.disabled = false;
+                    everythingBtn.textContent = '🚀 everything';
+                    everythingBtn.style.opacity = '1';
+                    stopEverythingBtn.disabled = true;
+                    stopEverythingBtn.textContent = '⏹️ Stop';
+                    stopEverythingBtn.style.opacity = '0.6';
+                })
+                .catch(error => {
+                    addLogEntry('Error stopping everything: ' + error);
+                    // Still re-enable everything button on error
+                    everythingBtn.disabled = false;
+                    everythingBtn.textContent = '🚀 everything';
+                    everythingBtn.style.opacity = '1';
+                    stopEverythingBtn.disabled = true;
+                    stopEverythingBtn.textContent = '⏹️ Stop';
+                    stopEverythingBtn.style.opacity = '0.6';
+                });
+        });
+
+        // everything with cleanup button
+        everythingCleanupBtn.addEventListener('click', () => {
+            // Disable cleanup button, enable stop cleanup button
+            everythingCleanupBtn.disabled = true;
+            everythingCleanupBtn.textContent = '🧹 Starting...';
+            everythingCleanupBtn.style.opacity = '0.6';
+            stopEverythingCleanupBtn.disabled = false;
+            stopEverythingCleanupBtn.style.opacity = '1';
+            
+            fetch('/everything_with_cleanup', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                    everythingCleanupBtn.textContent = '🧹 Everything with Cleanup';
+                })
+                .catch(error => {
+                    addLogEntry('Error with everything cleanup routine: ' + error);
+                    // Re-enable cleanup button on error
+                    everythingCleanupBtn.disabled = false;
+                    everythingCleanupBtn.textContent = '🧹 Everything with Cleanup';
+                    everythingCleanupBtn.style.opacity = '1';
+                    stopEverythingCleanupBtn.disabled = true;
+                    stopEverythingCleanupBtn.style.opacity = '0.6';
+                });
+        });
+
+        // stop everything with cleanup button
+        stopEverythingCleanupBtn.addEventListener('click', () => {
+            // Disable stop button while processing
+            stopEverythingCleanupBtn.disabled = true;
+            stopEverythingCleanupBtn.textContent = '⏹️ Stopping...';
+            
+            fetch('/stop_everything_with_cleanup', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(data.message);
+                    // Re-enable cleanup button and disable stop button
+                    everythingCleanupBtn.disabled = false;
+                    everythingCleanupBtn.textContent = '🧹 Everything with Cleanup';
+                    everythingCleanupBtn.style.opacity = '1';
+                    stopEverythingCleanupBtn.disabled = true;
+                    stopEverythingCleanupBtn.textContent = '⏹️ Stop';
+                    stopEverythingCleanupBtn.style.opacity = '0.6';
+                })
+                .catch(error => {
+                    addLogEntry('Error stopping everything cleanup: ' + error);
+                    // Re-enable cleanup button on error too
+                    everythingCleanupBtn.disabled = false;
+                    everythingCleanupBtn.textContent = '🧹 Everything with Cleanup';
+                    everythingCleanupBtn.style.opacity = '1';
+                    stopEverythingCleanupBtn.disabled = true;
+                    stopEverythingCleanupBtn.textContent = '⏹️ Stop';
+                    stopEverythingCleanupBtn.style.opacity = '0.6';
+                });
+        });
+
+        // Initially disable stop buttons
+        stopEverythingBtn.disabled = true;
+        stopEverythingBtn.style.opacity = '0.6';
+        stopEverythingCleanupBtn.disabled = true;
+        stopEverythingCleanupBtn.style.opacity = '0.6';
+        
+        // Ensure everything button starts enabled
+        everythingBtn.disabled = false;
+        everythingBtn.style.opacity = '1';
+        
+        // ROI Preset switching
+        roiPresetButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const roiName = button.dataset.roi;
+                
+                fetch('/switch_roi', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roi_name: roiName })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        addLogEntry('Error: ' + data.error);
+                    } else {
+                        addLogEntry(data.message);
+                        // Update current ROI display
+                        currentRoiNameDisplay.textContent = data.current_roi_name;
+                        
+                        // Update coordinate displays
+                        currentRoiX = data.settings.x;
+                        currentRoiY = data.settings.y;
+                        currentWidth = data.settings.width;
+                        currentHeight = data.settings.height;
+                        
+                        updateCoordinateDisplay();
+                        
+                        // Update button styles to show active preset
+                        roiPresetButtons.forEach(btn => {
+                            if (btn.dataset.roi === data.current_roi_name) {
+                                btn.style.opacity = '1';
+                                btn.style.fontWeight = 'bold';
+                            } else {
+                                btn.style.opacity = '0.7';
+                                btn.style.fontWeight = 'normal';
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    addLogEntry('Error switching ROI: ' + error);
+                });
+            });
+        });
+        
+        // Socket events
+        socket.on('status', (data) => {
+            statusBar.textContent = `Status: ${data.message}`;
+            addLogEntry(data.message);
+            
+            if (data.message.includes('STARTED')) {
+                isRunning = true;
+                toggleBtn.textContent = 'Turn Off';
+                toggleBtn.classList.remove('off');
+            } else if (data.message.includes('STOPPED')) {
+                isRunning = false;
+                toggleBtn.textContent = 'Turn On';
+                toggleBtn.classList.add('off');
+            }
+        });
+        
+        socket.on('detection', (data) => {
+            if (data.found) {
+                detectXDisplay.textContent = data.x;
+                detectYDisplay.textContent = data.y;
+                detectStatusDisplay.textContent = 'FOUND';
+                addLogEntry(`Red blob detected at (${data.x}, ${data.y})`);
+            } else {
+                detectStatusDisplay.textContent = 'NOT FOUND';
+                addLogEntry('Red blob not found');
+            }
+        });
+        
+        socket.on('frame', (data) => {
+            roiPreview.src = 'data:image/jpeg;base64,' + data.image;
+            roiPreview.style.display = 'block';
+            previewOverlay.style.display = 'none';
+        });
+
+        // Handle multiple build images
+        socket.on('build_images', (data) => {
+            console.log('Received build_images event:', data);
+            const container = document.getElementById('build-images-container');
+            const grid = document.getElementById('build-images-grid');
+            
+            // Clear previous images
+            grid.innerHTML = '';
+            
+            if (data.images && data.images.length > 0) {
+                data.images.forEach((item, index) => {
+                    const imageItem = document.createElement('div');
+                    imageItem.style.cssText = 'text-align: center; border: 1px solid #444; padding: 5px; border-radius: 4px; background: #2a2a2a;';
+                    
+                    const label = document.createElement('div');
+                    label.textContent = `[${item.key}] Build ${index + 1}`;
+                    label.style.cssText = 'color: #ffeb3b; font-weight: bold; margin-bottom: 5px; font-size: 12px;';
+                    
+                    const img = document.createElement('img');
+                    img.src = item.image;
+                    img.style.cssText = 'width: 100%; height: auto; border-radius: 2px;';
+                    
+                    const info = document.createElement('div');
+                    info.innerHTML = `${item.info.width}x${item.info.height}<br>(${item.info.x}, ${item.info.y})`;
+                    info.style.cssText = 'color: #ccc; font-size: 10px; margin-top: 5px;';
+                    
+                    imageItem.appendChild(label);
+                    imageItem.appendChild(img);
+                    imageItem.appendChild(info);
+                    grid.appendChild(imageItem);
+                });
+                
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        });
+
+        // Handle multiple red blob images
+        socket.on('red_blob_images', (data) => {
+            console.log('Received red_blob_images event:', data);
+            const container = document.getElementById('red-blob-images-container');
+            const grid = document.getElementById('red-blob-images-grid');
+            
+            // Clear previous images
+            grid.innerHTML = '';
+            
+            if (data.images && data.images.length > 0) {
+                data.images.forEach((item, index) => {
+                    const imageItem = document.createElement('div');
+                    imageItem.style.cssText = 'text-align: center; border: 1px solid #444; padding: 5px; border-radius: 4px; background: #2a2a2a;';
+                    
+                    const label = document.createElement('div');
+                    label.textContent = `[${item.key}] Blob ${index + 1}`;
+                    label.style.cssText = 'color: #f44336; font-weight: bold; margin-bottom: 5px; font-size: 12px;';
+                    
+                    const img = document.createElement('img');
+                    img.src = item.image;
+                    img.style.cssText = 'width: 100%; height: auto; border-radius: 2px;';
+                    
+                    const info = document.createElement('div');
+                    info.innerHTML = `${item.info.width}x${item.info.height}<br>(${item.info.x}, ${item.info.y})<br>C: ${item.info.circularity.toFixed(2)}`;
+                    info.style.cssText = 'color: #ccc; font-size: 10px; margin-top: 5px;';
+                    
+                    imageItem.appendChild(label);
+                    imageItem.appendChild(img);
+                    imageItem.appendChild(info);
+                    grid.appendChild(imageItem);
+                });
+                
+                container.style.display = 'block';
+            } else {
+                container.style.display = 'none';
+            }
+        });
+        
+        // Initialize to research_indicator coordinates
+        updateCoordinateDisplay();
+        updateRoiSettings(); // Send initial coordinates to backend
+        addLogEntry('Automation controller initialized - research_indicator ROI: (360,856) 50x50');
+        
+        // Set initial active ROI button style
+        roiPresetButtons.forEach(btn => {
+            if (btn.dataset.roi === 'research_indicator') {
+                btn.style.opacity = '1';
+                btn.style.fontWeight = 'bold';
+            } else {
+                btn.style.opacity = '0.7';
+                btn.style.fontWeight = 'normal';
+            }
+        });
+    </script>
+</body>
+</html>
