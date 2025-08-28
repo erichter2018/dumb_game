@@ -1499,11 +1499,6 @@ def everything_with_cleanup():
                                 print(f"[automation] Released mouse button in finally block", flush=True)
                             except Exception as e:
                                 print(f"[automation] Error releasing mouse in finally: {e}", flush=True)
-                    
-                    else:
-                        print(f"[automation] Failed to capture screen region", flush=True)
-                        time.sleep(1)
-                        continue
                 
                 except Exception as e:
                     print(f"[automation] Error in everything with cleanup cycle: {e}", flush=True)
