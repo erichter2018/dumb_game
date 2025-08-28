@@ -1182,6 +1182,7 @@ def everything_with_cleanup():
                                             time.sleep(0.5)
                                 continue
                             else:
+                                # No red blobs found either - wait and continue
                                 print(f"[automation] No red blobs found either - waiting 5 seconds", flush=True)
                                 for i in range(10):  # 10 * 0.5 = 5 seconds
                                     if not everything_cleanup_running:
@@ -1189,15 +1190,6 @@ def everything_with_cleanup():
                                         return
                                     time.sleep(0.5)
                                 continue
-                        else:
-                            # No red blobs found either - wait and continue
-                            print(f"[automation] No red blobs found either - waiting 5 seconds", flush=True)
-                            for i in range(10):  # 10 * 0.5 = 5 seconds
-                                if not everything_cleanup_running:
-                                    print(f"[automation] Stop requested during build wait - exiting", flush=True)
-                                    return
-                                time.sleep(0.5)
-                            continue
                     else:
                         # Builds were found initially - use them directly
                         update_status(phase=f"Cycle {cycle_count} - Found {len(builds)} builds", builds_found=len(builds), last_action=f"Found {len(builds)} builds")
