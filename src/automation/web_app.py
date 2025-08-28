@@ -1052,7 +1052,7 @@ def everything_with_cleanup():
                     cap.__exit__(None, None, None)
                     
                     if rgb is not None:
-                        builds = detect_blue_rectangles(rgb)
+                        builds = detect_blue_rectangles(rgb)  # Use the same function as web interface
                         
                         if not builds:
                             print(f"[automation] No blue rectangles found - searching for red blobs to click", flush=True)
@@ -1535,11 +1535,14 @@ def everything_with_cleanup():
                 print(f"[automation] Build cycle complete, looking for next build...", flush=True)
                 
                 # Reset retry count for the build we just completed successfully
-                if 'build' in locals():
-                    build_key = (build['x'], build['y'], build['width'], build['height'])
-                    if build_key in build_retry_count:
-                        print(f"[automation] Resetting retry count for completed build ({build['x']}, {build['y']})", flush=True)
-                        build_retry_count[build_key] = 0  # Reset to 0 for successful completion
+                try:
+                    if 'build' in locals() and build is not None:
+                        build_key = (build['x'], build['y'], build['width'], build['height'])
+                        if build_key in build_retry_count:
+                            print(f"[automation] Resetting retry count for completed build ({build['x']}, {build['y']})", flush=True)
+                            build_retry_count[build_key] = 0  # Reset to 0 for successful completion
+                except Exception as e:
+                    print(f"[automation] Error resetting build retry count: {e}", flush=True)
         
         everything_cleanup_thread = threading.Thread(target=everything_cleanup_loop)
         everything_cleanup_thread.start()
