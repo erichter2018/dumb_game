@@ -348,11 +348,11 @@ def check_mouse_movement():
             last_mouse_check_time = current_time
             return False
         
-        # Check if mouse moved significantly (more than 5 pixels)
+        # Check if mouse moved significantly (more than 20 pixels - increased from 5 to ignore small movements)
         distance = ((current_pos[0] - last_mouse_position[0]) ** 2 + 
                    (current_pos[1] - last_mouse_position[1]) ** 2) ** 0.5
         
-        if distance > 5:
+        if distance > 20:
             print(f"[automation] Mouse movement detected: {distance:.1f} pixels - pausing for 5 seconds", flush=True)
             last_mouse_position = current_pos
             last_mouse_check_time = current_time
