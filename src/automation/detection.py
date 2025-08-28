@@ -222,9 +222,9 @@ def detect_blue_rectangles(rgb: np.ndarray):
         white_ratio = white_pixels / (w * h)
         print(f"[automation] Blue contour {i+1}: white_pixels={white_pixels}, white_ratio={white_ratio:.3f}", flush=True)
         
-        # Must have significant white content (text)
-        if white_ratio < 0.08:  # At least 8% white pixels
-            print(f"[automation] Blue contour {i+1}: REJECTED - insufficient white text ({white_ratio:.3f} < 0.08)", flush=True)
+        # Must have significant white content (text) - more lenient for minimal text
+        if white_ratio < 0.05:  # At least 5% white pixels (reduced from 8% for minimal text)
+            print(f"[automation] Blue contour {i+1}: REJECTED - insufficient white text ({white_ratio:.3f} < 0.05)", flush=True)
             continue
         
         # Check for yellow/orange circle (should always be present)
@@ -234,9 +234,9 @@ def detect_blue_rectangles(rgb: np.ndarray):
         yellow_pixels = np.sum(yellow_mask > 0)
         print(f"[automation] Blue contour {i+1}: yellow_pixels={yellow_pixels}", flush=True)
         
-        # Must have yellow/orange circle
-        if yellow_pixels < 50:  # Should have at least 50 yellow pixels for the circle
-            print(f"[automation] Blue contour {i+1}: REJECTED - no yellow circle ({yellow_pixels} < 50)", flush=True)
+        # Must have yellow/orange circle - more lenient for smaller circles
+        if yellow_pixels < 30:  # Should have at least 30 yellow pixels for the circle (reduced from 50)
+            print(f"[automation] Blue contour {i+1}: REJECTED - no yellow circle ({yellow_pixels} < 30)", flush=True)
             continue
         
         # Try OCR for additional validation
