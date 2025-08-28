@@ -15,6 +15,88 @@
             min-height: 100vh;
         }
         
+        .status-bar {
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding-bottom: 8px;
+        }
+        
+        .status-title {
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .status-time {
+            color: #81C784;
+            font-size: 11px;
+        }
+        
+        .status-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .status-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            padding: 8px;
+        }
+        
+        .status-section h4 {
+            color: #4CAF50;
+            margin: 0 0 6px 0;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 3px 0;
+            padding: 2px 0;
+        }
+        
+        .status-label {
+            color: #81C784;
+            font-weight: bold;
+        }
+        
+        .status-value {
+            color: white;
+            font-weight: bold;
+        }
+        
+        .status-value.running {
+            color: #4CAF50;
+        }
+        
+        .status-value.stopped {
+            color: #f44336;
+        }
+        
+        .status-value.waiting {
+            color: #FF9800;
+        }
+        
+        .status-value.error {
+            color: #f44336;
+        }
+        
         .container {
             max-width: 1000px;
             margin: 0 auto;
@@ -295,7 +377,44 @@
 <body>
     <div class="container">
         <h1>🎯 Automation Controller</h1>
-        <div class="status-bar" id="status-bar">Status: STOPPED</div>
+        <div class="status-bar">
+            <div class="status-header">
+                <div class="status-title">🔍 Automation Status</div>
+                <div class="status-time" id="status-time">--:--:--</div>
+            </div>
+            <div class="status-content">
+                <div class="status-section">
+                    <h4>Routine Status</h4>
+                    <div class="status-item">
+                        <span class="status-label">Everything:</span>
+                        <span class="status-value" id="everything-status">Stopped</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Everything w/ Cleanup:</span>
+                        <span class="status-value" id="everything-cleanup-status">Stopped</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Current Phase:</span>
+                        <span class="status-value" id="current-phase">Idle</span>
+                    </div>
+                </div>
+                <div class="status-section">
+                    <h4>Detection Status</h4>
+                    <div class="status-item">
+                        <span class="status-label">Builds Found:</span>
+                        <span class="status-value" id="builds-found">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Red Blobs Found:</span>
+                        <span class="status-value" id="red-blobs-found">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Last Action:</span>
+                        <span class="status-value" id="last-action">None</span>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <div class="main-controls">
                                 <div class="control-panel">
@@ -573,6 +692,72 @@
                 });
         });
 
+        // Status update functionality
+        function updateStatusBar(data) {
+            const statusTime = document.getElementById('status-time');
+            const everythingStatus = document.getElementById('everything-status');
+            const everythingCleanupStatus = document.getElementById('everything-cleanup-status');
+            const currentPhase = document.getElementById('current-phase');
+            const buildsFound = document.getElementById('builds-found');
+            const redBlobsFound = document.getElementById('red-blobs-found');
+            const lastAction = document.getElementById('last-action');
+            
+            // Update time
+            statusTime.textContent = new Date().toLocaleTimeString();
+            
+            // Update routine statuses
+            if (data.everything_running) {
+                everythingStatus.textContent = 'Running';
+                everythingStatus.className = 'status-value running';
+            } else {
+                everythingStatus.textContent = 'Stopped';
+                everythingStatus.className = 'status-value stopped';
+            }
+            
+            if (data.everything_cleanup_running) {
+                everythingCleanupStatus.textContent = 'Running';
+                everythingCleanupStatus.className = 'status-value running';
+            } else {
+                everythingCleanupStatus.textContent = 'Stopped';
+                everythingCleanupStatus.className = 'status-value stopped';
+            }
+            
+            // Update current phase
+            if (data.current_phase) {
+                currentPhase.textContent = data.current_phase;
+                currentPhase.className = 'status-value running';
+            } else {
+                currentPhase.textContent = 'Idle';
+                currentPhase.className = 'status-value stopped';
+            }
+            
+            // Update detection counts
+            if (data.builds_found !== undefined) {
+                buildsFound.textContent = data.builds_found;
+            }
+            
+            if (data.red_blobs_found !== undefined) {
+                redBlobsFound.textContent = data.red_blobs_found;
+            }
+            
+            // Update last action
+            if (data.last_action) {
+                lastAction.textContent = data.last_action;
+            }
+        }
+        
+        // Request status updates every 2 seconds
+        setInterval(() => {
+            fetch('/get_status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusBar(data);
+                })
+                .catch(error => {
+                    console.log('Status update failed:', error);
+                });
+        }, 2000);
+        
         // stop everything button
         stopEverythingBtn.addEventListener('click', () => {
             // Disable stop button while processing

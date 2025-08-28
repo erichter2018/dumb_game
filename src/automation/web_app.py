@@ -27,6 +27,32 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 TARGET_APP_TITLE = "iPhone Mirroring"
 automation_worker = None
 
+# Status tracking
+automation_status = {
+    'everything_running': False,
+    'everything_cleanup_running': False,
+    'current_phase': 'Idle',
+    'builds_found': 0,
+    'red_blobs_found': 0,
+    'last_action': 'None',
+    'last_update': time.time()
+}
+
+def update_status(phase=None, builds_found=None, red_blobs_found=None, last_action=None):
+    """Update automation status"""
+    global automation_status
+    
+    if phase:
+        automation_status['current_phase'] = phase
+    if builds_found is not None:
+        automation_status['builds_found'] = builds_found
+    if red_blobs_found is not None:
+        automation_status['red_blobs_found'] = red_blobs_found
+    if last_action:
+        automation_status['last_action'] = last_action
+    
+    automation_status['last_update'] = time.time()
+
 def encode_rgb_to_base64(rgb):
     """Helper function to encode RGB image to base64 - matches show_build pattern"""
     import cv2
@@ -280,6 +306,17 @@ def get_status():
         'current_roi_name': current_roi_name,
         'roi_presets': roi_presets
     })
+
+@app.route('/get_status')
+def get_automation_status():
+    """Get detailed automation status for the status bar"""
+    global automation_status
+    
+    # Update status with current running states
+    automation_status['everything_running'] = everything_running
+    automation_status['everything_cleanup_running'] = everything_cleanup_running
+    
+    return jsonify(automation_status)
 
 
 
@@ -968,6 +1005,7 @@ def everything_with_cleanup():
         # Set the flag to start the routine
         everything_cleanup_running = True
         print(f"[automation] === EVERYTHING WITH CLEANUP ROUTINE STARTED ===", flush=True)
+        update_status(phase="Starting Everything with Cleanup", last_action="Routine started")
         
         # Start the continuous routine in a separate thread
         import threading
@@ -990,6 +1028,7 @@ def everything_with_cleanup():
                 research_timer = 0  # Reset timer at start of each cycle for consistent 3s intervals
                 max_check_timer = 0  # Reset MAX check timer
                 print(f"[automation] === EVERYTHING WITH CLEANUP CYCLE {cycle_count} ===", flush=True)
+                update_status(phase=f"Cycle {cycle_count} - Searching for builds", last_action="Starting new cycle")
                 
                 try:
                     # Step 1: Find a blue rectangle (buildbuildbuild part 1)
@@ -1015,8 +1054,11 @@ def everything_with_cleanup():
                         
                         if not builds:
                             print(f"[automation] No blue rectangles found - searching for red blobs to click", flush=True)
+                            update_status(phase=f"Cycle {cycle_count} - No builds found, searching red blobs", builds_found=0, last_action="No builds found")
                             
                             # Search for red blobs when no builds are found
+                        else:
+                            update_status(phase=f"Cycle {cycle_count} - Found {len(builds)} builds", builds_found=len(builds), last_action=f"Found {len(builds)} builds")
                             red_blobs = detect_red_blobs(rgb)
                             if red_blobs:
                                 # Filter out recently tried red blobs to ensure progression
@@ -1257,6 +1299,7 @@ def everything_with_cleanup():
                         
                         # Step 2: Check if the build is still present before holding (with retries)
                         print(f"[automation] Step 2: Verifying build presence before holding", flush=True)
+                        update_status(phase=f"Cycle {cycle_count} - Verifying build presence", last_action="Verifying build after click")
                         build_verified = False
                         max_retries = 3
                         
@@ -1286,6 +1329,7 @@ def everything_with_cleanup():
                                     break  # Success, exit retry loop
                                 else:
                                     print(f"[automation] Build not found on retry {retry + 1}/{max_retries} - waiting 0.5s before retry", flush=True)
+                                    update_status(phase=f"Cycle {cycle_count} - Build verification retry {retry + 1}/{max_retries}", last_action=f"Build verification retry {retry + 1}")
                                     time.sleep(0.5)  # Wait before retry
                             else:
                                 print(f"[automation] Failed to capture for verification on retry {retry + 1}/{max_retries}", flush=True)
@@ -1293,6 +1337,7 @@ def everything_with_cleanup():
                         
                         if not build_verified:
                             print(f"[automation] Build verification failed after {max_retries} retries - restarting cycle", flush=True)
+                            update_status(phase=f"Cycle {cycle_count} - Build verification failed", last_action=f"Build verification failed after {max_retries} retries")
                             break  # Break out to restart cycle
                         
                         # Step 3: Begin the continuous press (build is confirmed present)
@@ -1480,6 +1525,7 @@ def stop_everything_with_cleanup():
     if everything_cleanup_running:
         everything_cleanup_running = False
         print(f"[automation] === EVERYTHING WITH CLEANUP ROUTINE STOP REQUESTED ===", flush=True)
+        update_status(phase="Stopping Everything with Cleanup", last_action="Routine stop requested")
         print(f"[automation] Set everything_cleanup_running to False", flush=True)
         
         # Try to release any held mouse buttons
