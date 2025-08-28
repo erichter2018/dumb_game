@@ -14,8 +14,21 @@ def detect_red_blobs(rgb: np.ndarray):
         
     Returns:
         list: List of dicts with 'center': (x, y), 'bounds': (x, y, w, h), 'circularity': float
+        
+    Note:
+        Red blobs in the top 30% and left 20% region are ignored to avoid UI elements.
+        This restriction can be modified by changing the TOP_EXCLUDE_RATIO and LEFT_EXCLUDE_RATIO constants.
     """
     import cv2
+    
+    # Configuration for region exclusion - easily modifiable
+    TOP_EXCLUDE_RATIO = 0.30    # Ignore red blobs in top 30% of window
+    LEFT_EXCLUDE_RATIO = 0.20   # Ignore red blobs in left 20% of window
+    
+    # Calculate exclusion boundaries
+    img_height, img_width = rgb.shape[:2]
+    top_exclude_boundary = int(img_height * TOP_EXCLUDE_RATIO)
+    left_exclude_boundary = int(img_width * LEFT_EXCLUDE_RATIO)
     
     # Convert to HSV for better color detection
     hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
@@ -46,8 +59,15 @@ def detect_red_blobs(rgb: np.ndarray):
         if area < 400 or area > 2500:  # More generous range: 400-2500 pixels
             continue
         
-        # Get bounding rectangle
+        # Get bounding rectangle for position checking
         x, y, w, h = cv2.boundingRect(contour)
+        center_x = x + w // 2
+        center_y = y + h // 2
+        
+        # Filter out red blobs in the excluded region (top 30% and left 20%)
+        if center_y < top_exclude_boundary and center_x < left_exclude_boundary:
+            print(f"[automation] Red contour {i+1}: REJECTED - in excluded region (top {TOP_EXCLUDE_RATIO*100}% and left {LEFT_EXCLUDE_RATIO*100}%) at ({center_x}, {center_y})", flush=True)
+            continue
         
         # Size check - should be roughly 30-40 pixels in each dimension
         if w < 20 or h < 20 or w > 50 or h > 50:

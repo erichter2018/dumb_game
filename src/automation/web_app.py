@@ -1246,11 +1246,46 @@ def everything_with_cleanup():
                             print(f"[automation] Stop requested before starting press - exiting", flush=True)
                             return
                         
-                        print(f"[automation] Starting continuous press at ({build_center_x}, {build_center_y})", flush=True)
+                        print(f"[automation] Starting build interaction at ({build_center_x}, {build_center_y})", flush=True)
                         move_mouse_to(build_center_x, build_center_y)
                         time.sleep(0.1)
                         
-                        # Begin the press (this will be a long hold with interruptions)
+                        # Step 1: Click once in the middle of the blue build to ensure it's active
+                        print(f"[automation] Step 1: Single click to activate build", flush=True)
+                        click(build_center_x, build_center_y, hold_ms=50)
+                        time.sleep(0.5)  # Wait for build to stabilize
+                        
+                        # Step 2: Check if the build is still present before holding
+                        print(f"[automation] Step 2: Verifying build presence before holding", flush=True)
+                        cap_verify = RoiCapture(window_x, window_y + top_offset, window_w, effective_height)
+                        cap_verify.__enter__()
+                        frame_verify = cap_verify.grab()
+                        rgb_verify = frame_verify.to_rgb()
+                        cap_verify.__exit__(None, None, None)
+                        
+                        if rgb_verify is not None:
+                            builds_verify = detect_blue_rectangles(rgb_verify)
+                            build_still_present = False
+                            
+                            for verify_build in builds_verify:
+                                # Check if this is the same build (same position and size)
+                                if (abs(verify_build['x'] - build_x) < 10 and
+                                    abs(verify_build['y'] - build_y) < 10 and
+                                    abs(verify_build['width'] - build_w) < 10 and
+                                    abs(verify_build['height'] - build_h) < 10):
+                                    build_still_present = True
+                                    print(f"[automation] Build verified - still present at ({verify_build['x']}, {verify_build['y']})", flush=True)
+                                    break
+                            
+                            if not build_still_present:
+                                print(f"[automation] Build disappeared after click - restarting cycle", flush=True)
+                                break  # Break out to restart cycle
+                        else:
+                            print(f"[automation] Failed to verify build - restarting cycle", flush=True)
+                            break  # Break out to restart cycle
+                        
+                        # Step 3: Begin the continuous press (build is confirmed present)
+                        print(f"[automation] Step 3: Starting continuous press (build confirmed present)", flush=True)
                         from pynput.mouse import Button, Controller
                         _mouse = Controller()
                         _mouse.position = (build_center_x, build_center_y)
