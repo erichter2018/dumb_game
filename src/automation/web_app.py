@@ -1022,6 +1022,8 @@ def everything_with_cleanup():
             tried_red_blobs = []  # Track recently tried red blob positions to avoid repeating
             last_red_blob_click = None  # Track the last red blob click location
             builds_before_click = []  # Track builds that existed before red blob click
+            tried_builds = []  # Track recently tried builds to avoid infinite loops
+            build_retry_count = {}  # Track retry count for each build
             
             while everything_cleanup_running:
                 cycle_count += 1
@@ -1248,10 +1250,33 @@ def everything_with_cleanup():
                                 build = closest_build
                                 print(f"[automation] No new builds found, selected closest existing build: ({build['x']}, {build['y']}) {build['width']}x{build['height']}, distance: {min_distance:.1f}", flush=True)
                         else:
-                            # Use the first valid build (largest by area)
+                            # Use builds with retry logic to avoid infinite loops
                             if builds:
-                                build = builds[0]
-                                print(f"[automation] Selected largest build from {len(builds)} available: ({build['x']}, {build['y']}) {build['width']}x{build['height']}", flush=True)
+                                # Filter out builds that have been tried too many times
+                                available_builds = []
+                                for candidate_build in builds:
+                                    build_key = (candidate_build['x'], candidate_build['y'], candidate_build['width'], candidate_build['height'])
+                                    retry_count = build_retry_count.get(build_key, 0)
+                                    
+                                    if retry_count < 3:  # Allow max 3 retries per build
+                                        available_builds.append(candidate_build)
+                                    else:
+                                        print(f"[automation] Skipping build ({candidate_build['x']}, {candidate_build['y']}) - exceeded {retry_count} retries", flush=True)
+                                
+                                if available_builds:
+                                    # Select the build with the lowest retry count (prefer untried builds)
+                                    build = min(available_builds, key=lambda b: build_retry_count.get((b['x'], b['y'], b['width'], b['height']), 0))
+                                    build_key = (build['x'], build['y'], build['width'], build['height'])
+                                    retry_count = build_retry_count.get(build_key, 0)
+                                    build_retry_count[build_key] = retry_count + 1
+                                    
+                                    print(f"[automation] Selected build ({build['x']}, {build['y']}) {build['width']}x{build['height']} - retry {retry_count + 1}/3", flush=True)
+                                else:
+                                    print(f"[automation] All {len(builds)} builds have exceeded retry limit - searching for red blobs", flush=True)
+                                    # Reset build retry counts and search for red blobs
+                                    build_retry_count.clear()
+                                    tried_builds.clear()
+                                    continue  # Skip to red blob search
                             else:
                                 print(f"[automation] ERROR: No builds available for selection - this should not happen", flush=True)
                                 continue  # Skip this cycle and try again
@@ -1508,6 +1533,13 @@ def everything_with_cleanup():
                     continue
                 
                 print(f"[automation] Build cycle complete, looking for next build...", flush=True)
+                
+                # Reset retry count for the build we just completed successfully
+                if 'build' in locals():
+                    build_key = (build['x'], build['y'], build['width'], build['height'])
+                    if build_key in build_retry_count:
+                        print(f"[automation] Resetting retry count for completed build ({build['x']}, {build['y']})", flush=True)
+                        build_retry_count[build_key] = 0  # Reset to 0 for successful completion
         
         everything_cleanup_thread = threading.Thread(target=everything_cleanup_loop)
         everything_cleanup_thread.start()
