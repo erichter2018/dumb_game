@@ -15,7 +15,7 @@ from PIL import Image
 
 from .capture import RoiCapture
 from .macos_windows import find_first_window_bounds_by_title_pixels
-from .input_control import click
+from .input_control import click, move_mouse_to
 from .detection import detect_red_blobs, detect_blue_rectangles
 import cv2
 
@@ -744,7 +744,6 @@ def everything():
                     
                     # Step 2: Focus the app (only on first cycle, not after mouse movement restarts)
                     if need_focus:
-                        from .input_control import move_mouse_to
                         app_center_x = window_x + (window_w // 2)
                         app_center_y = window_y + (window_h // 2)
                         print(f"[automation] Focusing app at ({app_center_x}, {app_center_y})", flush=True)
@@ -976,7 +975,6 @@ def everything_with_cleanup():
             global everything_cleanup_running
             
             # Import input control functions at the top
-            from .input_control import move_mouse_to, click
             
             cycle_count = 0
             need_focus = True  # Only focus on first cycle, not after mouse movement restarts
@@ -1071,12 +1069,13 @@ def everything_with_cleanup():
                                         
                                         # Capture builds before clicking to identify new ones later
                                         cap_before = RoiCapture(window_x, window_y + top_offset, window_w, effective_height)
-                                        with cap_before:
-                                            frame_before = cap_before.grab()
-                                            if frame_before:
-                                                rgb_before = frame_before.to_rgb()
-                                                builds_before_click = detect_blue_rectangles(rgb_before)
-                                                print(f"[automation] Builds before click: {len(builds_before_click)}", flush=True)
+                                        cap_before.__enter__()
+                                        frame_before = cap_before.grab()
+                                        if frame_before:
+                                            rgb_before = frame_before.to_rgb()
+                                            builds_before_click = detect_blue_rectangles(rgb_before)
+                                            print(f"[automation] Builds before click: {len(builds_before_click)}", flush=True)
+                                        cap_before.__exit__(None, None, None)
                                         
                                         move_mouse_to(red_center_x, red_center_y)
                                         click(red_center_x, red_center_y, hold_ms=100)
@@ -1087,18 +1086,19 @@ def everything_with_cleanup():
                                         # Wait a moment and check if builds appeared
                                         time.sleep(2)  # Wait for builds to appear
                                         cap_check = RoiCapture(*window_bounds)
-                                        with cap_check:
-                                            frame_check = cap_check.grab()
-                                            if frame_check:
-                                                rgb_check = frame_check.to_rgb()
-                                                builds_after_click = detect_blue_rectangles(rgb_check)
-                                                if builds_after_click:
-                                                    print(f"[automation] Red blob {attempt + 1}, position {pos_attempt + 1} produced {len(builds_after_click)} builds - success!", flush=True)
-                                                    success = True
-                                                    blob_success = True
-                                                    break  # Exit position loop
-                                                else:
-                                                    print(f"[automation] Red blob {attempt + 1}, position {pos_attempt + 1} didn't produce builds", flush=True)
+                                        cap_check.__enter__()
+                                        frame_check = cap_check.grab()
+                                        if frame_check:
+                                            rgb_check = frame_check.to_rgb()
+                                            builds_after_click = detect_blue_rectangles(rgb_check)
+                                            if builds_after_click:
+                                                print(f"[automation] Red blob {attempt + 1}, position {pos_attempt + 1} produced {len(builds_after_click)} builds - success!", flush=True)
+                                                success = True
+                                                blob_success = True
+                                                break  # Exit position loop
+                                            else:
+                                                print(f"[automation] Red blob {attempt + 1}, position {pos_attempt + 1} didn't produce builds", flush=True)
+                                        cap_check.__exit__(None, None, None)
                                         
                                         # If this is the last position for this blob, wait a bit before trying next blob
                                         if pos_attempt < len(click_positions) - 1:
@@ -1230,7 +1230,6 @@ def everything_with_cleanup():
                                 return
                             
                             # Step 2: Focus the app
-                            from .input_control import move_mouse_to
                             app_center_x = window_x + (window_w // 2)
                             app_center_y = window_y + (window_h // 2)
                             print(f"[automation] Focusing app at ({app_center_x}, {app_center_y})", flush=True)
@@ -1536,7 +1535,7 @@ def run_cleanup_routine(window_bounds, last_build_center):
                         
                         print(f"[automation] Cleanup: Found red blob at ({abs_blob_x}, {abs_blob_y}), clicking at ({click_x}, {click_y})", flush=True)
                         
-                        from .input_control import move_mouse_to
+
                         move_mouse_to(click_x, click_y)
                         time.sleep(0.1)
                         click(click_x, click_y, hold_ms=100)

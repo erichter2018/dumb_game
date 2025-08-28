@@ -34,7 +34,8 @@ class RoiCapture:
 
 	def grab(self) -> Frame:
 		if self._sct is None:
-			raise RuntimeError("RoiCapture must be used as a context manager or explicitly opened")
+			# Auto-initialize if not already done
+			self._sct = mss.mss()
 		rs = self._sct.grab(self._monitor)
 		img = np.array(rs, dtype=np.uint8)  # BGRA
 		return Frame(image_bgra=img, timestamp_ns=time.time_ns())

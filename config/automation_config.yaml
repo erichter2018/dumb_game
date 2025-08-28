@@ -1,0 +1,135 @@
+application:
+  target_window: "iPhone Mirroring"
+  capture_region: [0, 0, 800, 600]  # x, y, width, height
+
+detection:
+  blue_build:
+    description: "Detect blue build buttons to hold"
+    visual_indicators:
+      shape: "rectangular"
+      min_area: 1000
+      aspect_ratio_range: [1.5, 4.0]
+      color_range:
+        hsv_low: [100, 150, 50]
+        hsv_high: [150, 255, 255]
+    validation:
+      must_contain_text: true
+      text_color: "white"
+      min_text_ratio: 0.05
+
+  research_indicator:
+    description: "Red blob that indicates research is available"
+    roi: [360, 856, 50, 50]  # x, y, width, height
+    visual_indicators:
+      shape: "circular"
+      min_area: 100
+      circularity_threshold: 0.7
+      color_range:
+        hsv_low: [0, 150, 50]
+        hsv_high: [10, 255, 255]
+    exclusion_zones:
+      - [25, 25, 10, 10]  # x, y, width, height
+
+  max_indicator:
+    description: "Gray rectangle indicating build is maxed"
+    visual_indicators:
+      shape: "rectangular"
+      min_area: 1000
+      aspect_ratio_range: [1.5, 4.0]
+      color_range:
+        hsv_low: [0, 0, 100]
+        hsv_high: [180, 30, 200]
+    validation:
+      red_ratio_max: 0.01  # Must have almost no red
+
+  brown_3d_box:
+    description: "Brown 3D box elements"
+    visual_indicators:
+      shape: "rectangular"
+      min_area: 500
+      aspect_ratio_range: [0.8, 1.5]
+      color_range:
+        hsv_low: [10, 50, 50]
+        hsv_high: [25, 200, 200]
+
+workflows:
+  finish_building:
+    description: "Hold build until maxed, handle research interruptions"
+    steps:
+      - name: "find_blue_build"
+        action: "detect"
+        target: "blue_build"
+        on_success: "start_hold"
+        on_failure: "exit"
+      
+      - name: "start_hold"
+        action: "mouse_hold"
+        coordinates: "detected_position"
+        duration: "continuous"
+        on_interrupt: "check_research"
+      
+      - name: "check_research"
+        action: "detect"
+        target: "research_indicator"
+        interval: 3.0  # seconds
+        on_success: "execute_research"
+        on_failure: "check_max"
+      
+      - name: "check_max"
+        action: "detect"
+        target: "max_indicator"
+        interval: 10.0  # seconds
+        on_success: "stop_and_exit"
+        on_failure: "continue_hold"
+
+  research_sequence:
+    description: "Open research, click items, close research"
+    steps:
+      - name: "open_research"
+        action: "click"
+        coordinates: [388, 906]
+        wait_after: 0.5
+        
+      - name: "click_research_items"
+        action: "click_sequence"
+        coordinates: [328, 446]
+        count: 10
+        interval: 0.1
+        wait_after: 0.5
+        
+      - name: "close_research"
+        action: "click"
+        coordinates: [388, 906]
+        wait_after: 0.5
+
+actions:
+  mouse_hold:
+    description: "Hold mouse button continuously"
+    implementation: "pynput_hold"
+    focus_click: true
+    focus_wait: 0.2
+    initial_press_duration: 0.5
+
+  click:
+    description: "Single mouse click"
+    implementation: "pynput_click"
+    button: "left"
+    duration: 0.05
+
+  click_sequence:
+    description: "Multiple rapid clicks"
+    implementation: "pynput_click_sequence"
+    button: "left"
+    interval: 0.1
+
+  scroll:
+    description: "Scroll action (click, hold, move, release)"
+    implementation: "pynput_scroll"
+    direction: "down"
+    distance: 100
+    duration: 0.5
+
+  detect:
+    description: "Computer vision detection"
+    implementation: "opencv_detection"
+    confidence_threshold: 0.8
