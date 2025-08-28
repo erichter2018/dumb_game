@@ -103,9 +103,9 @@ def detect_red_blobs(rgb: np.ndarray):
 
         white_ratio = white_pixels / total_pixels
 
-        # Slightly more lenient: should have white content for arrow - 18-60% white
-        if white_ratio < 0.18 or white_ratio > 0.60:
-            print(f"[automation] Red contour {i+1}: REJECTED - white ratio {white_ratio:.2f} not in arrow range (0.18-0.60)", flush=True)
+        # More lenient: should have white content for arrow - 8-70% white (adjusted for current red blobs)
+        if white_ratio < 0.08 or white_ratio > 0.70:
+            print(f"[automation] Red contour {i+1}: REJECTED - white ratio {white_ratio:.2f} not in arrow range (0.08-0.70)", flush=True)
             continue
 
         center_x = x + w // 2
@@ -137,6 +137,7 @@ def detect_red_blobs(rgb: np.ndarray):
                 continue
         
         print(f"[automation] FOUND: Red arrow at ({center_x}, {center_y}) size {w}x{h}, area={area}, circularity={circularity:.2f}, white_ratio={white_ratio:.2f}, red_ratio={red_ratio:.2f}", flush=True)
+        print(f"[automation] DEBUG: Image dimensions: {img_width}x{img_height}, exclusion boundaries: top<{top_exclude_boundary}, left<{left_exclude_boundary}", flush=True)
         
         red_blobs.append({
             'center': (int(center_x), int(center_y)),
