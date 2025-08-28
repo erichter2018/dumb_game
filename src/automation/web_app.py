@@ -1057,8 +1057,6 @@ def everything_with_cleanup():
                             update_status(phase=f"Cycle {cycle_count} - No builds found, searching red blobs", builds_found=0, last_action="No builds found")
                             
                             # Search for red blobs when no builds are found
-                        else:
-                            update_status(phase=f"Cycle {cycle_count} - Found {len(builds)} builds", builds_found=len(builds), last_action=f"Found {len(builds)} builds")
                             red_blobs = detect_red_blobs(rgb)
                             if red_blobs:
                                 # Filter out recently tried red blobs to ensure progression
@@ -1191,6 +1189,18 @@ def everything_with_cleanup():
                                         return
                                     time.sleep(0.5)
                                 continue
+                        else:
+                            # No red blobs found either - wait and continue
+                            print(f"[automation] No red blobs found either - waiting 5 seconds", flush=True)
+                            for i in range(10):  # 10 * 0.5 = 5 seconds
+                                if not everything_cleanup_running:
+                                    print(f"[automation] Stop requested during build wait - exiting", flush=True)
+                                    return
+                                time.sleep(0.5)
+                            continue
+                    else:
+                        # Builds were found initially - use them directly
+                        update_status(phase=f"Cycle {cycle_count} - Found {len(builds)} builds", builds_found=len(builds), last_action=f"Found {len(builds)} builds")
                         
                         # If we just clicked a red blob, try to find NEW builds that appeared after the click
                         if 'last_red_blob_click' in locals() and last_red_blob_click and 'builds_before_click' in locals():
@@ -1247,8 +1257,12 @@ def everything_with_cleanup():
                                 print(f"[automation] No new builds found, selected closest existing build: ({build['x']}, {build['y']}) {build['width']}x{build['height']}, distance: {min_distance:.1f}", flush=True)
                         else:
                             # Use the first valid build (largest by area)
-                            build = builds[0]
-                            print(f"[automation] Selected largest build from {len(builds)} available: ({build['x']}, {build['y']}) {build['width']}x{build['height']}", flush=True)
+                            if builds:
+                                build = builds[0]
+                                print(f"[automation] Selected largest build from {len(builds)} available: ({build['x']}, {build['y']}) {build['width']}x{build['height']}", flush=True)
+                            else:
+                                print(f"[automation] ERROR: No builds available for selection - this should not happen", flush=True)
+                                continue  # Skip this cycle and try again
                         
                         build_x = build['x']
                         build_y = build['y']
